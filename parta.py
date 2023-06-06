@@ -100,7 +100,6 @@ responseRDData = decmessage[startofRR+24:startofRR+24+(2*int(responseRDLength))]
 print(f'responseRDData: {responseRDData}')
 ipaddr = ''
 for i in range(0, len(responseRDData),2):
-  print(responseRDData[i:i+2])
   ipaddr += str(int(responseRDData[i:i+2], 16))
   ipaddr += '.'
 
