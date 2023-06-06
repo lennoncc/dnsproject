@@ -109,11 +109,12 @@ print(f'Domain Name: {url}')
 for i in range(len(ipArray)):
   print(f'IP Address {i+1}: {ipArray[i]}')
 
-clientSocket = socket(AF_INET, SOCK_DGRAM)
+clientSocket = socket(AF_INET, SOCK_STREAM)
 targethost = ipArray[0]
 print(targethost)
 clientSocket.connect((targethost, 80))
 request = "GET / HTTP/1.1\r\nHost:%s\r\n\r\n" % ipArray[0]
 clientSocket.send(request.encode())
 response = clientSocket.recv(4096)
-print(response.decode())
+f = open("webpage.html", "w")
+f.write(response.decode())
