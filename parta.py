@@ -45,14 +45,6 @@ questionbuf += str(hex(len(spliturl[1])))[2:]
 # Go through and add each letter of URL in hex format
 for i in spliturl[1]:
   questionbuf += format(ord(i), "x")
-# questionbuf += '03' # tmz has length 3
-# questionbuf += '74' # ascii for t
-# questionbuf += '6d' # ascii for m
-# questionbuf += '7a' # ascii for z
-# questionbuf += '03' # com has length 3
-# questionbuf += '63' # ascii for c
-# questionbuf += '6f' # ascii for o
-# questionbuf += '6d' # ascii for m
 questionbuf += '00' # zero byte to end QNAME
 questionbuf += '0001' # QTYPE
 questionbuf += '0001' # QCLASS
@@ -66,41 +58,62 @@ try:
 finally:
   clientSocket.close()
 
-print(f'in hex: {binascii.hexlify(message).decode("utf-8")}')
+# print(f'in hex: {binascii.hexlify(message).decode("utf-8")}')
 decmessage = binascii.hexlify(message).decode("utf-8")
 responseid = decmessage[0:4] # Parse through id
-print(f'id is {responseid}')
+# print(f'id is {responseid}')
 # Header
 flags = decmessage[4:8]
-print(f'flags are {flags}')
+# print(f'flags are {flags}')
 qdcount = decmessage[8:12]
-print(f'qdcount is {qdcount}')
+# print(f'qdcount is {qdcount}')
 ancount = decmessage[12:16]
-print(f'ancount is {ancount}')
+# print(f'ancount is {ancount}')
 nscount = decmessage[16:20]
-print(f'nscount is {nscount}')
+# print(f'nscount is {nscount}')
 arcount = decmessage[20:24]
-print(f'arcount is {arcount}')
+# print(f'arcount is {arcount}')
 # Question
-print(f'question should be: {decmessage[24:24+questionLen]}')
+# print(f'question should be: {decmessage[24:24+questionLen]}')
 startofRR = 24 + questionLen
-# Resource Record
-print(f'full RR: {decmessage[startofRR:len(decmessage)]}')
-responseName = decmessage[startofRR:startofRR+4]
-print(f'responseName: {responseName}')
-responseType = decmessage[startofRR+4:startofRR+8]
-print(f'responseType: {responseType}')
-responseClass = decmessage[startofRR+8:startofRR+12]
-print(f'responseClass: {responseClass}')
-responseTTL = decmessage[startofRR+12:startofRR+20]
-print(f'responseTTL: {responseTTL}')
-responseRDLength = decmessage[startofRR+20:startofRR+24]
-print(f'responseRDLength: {responseRDLength}')
-responseRDData = decmessage[startofRR+24:startofRR+24+(2*int(responseRDLength))]
-print(f'responseRDData: {responseRDData}')
-ipaddr = ''
-for i in range(0, len(responseRDData),2):
-  ipaddr += str(int(responseRDData[i:i+2], 16))
-  ipaddr += '.'
 
-print(ipaddr[0:len(ipaddr)-1])
+ipArray = []
+# Resource Record
+def decodeResourceRecord(decmessage, startofRR):
+  # print(f'full RR: {decmessage[startofRR:len(decmessage)]}')
+  responseName = decmessage[startofRR:startofRR+4]
+  # print(f'responseName: {responseName}')
+  responseType = decmessage[startofRR+4:startofRR+8]
+  # print(f'responseType: {responseType}')
+  responseClass = decmessage[startofRR+8:startofRR+12]
+  # print(f'responseClass: {responseClass}')
+  responseTTL = decmessage[startofRR+12:startofRR+20]
+  # print(f'responseTTL: {responseTTL}')
+  responseRDLength = decmessage[startofRR+20:startofRR+24]
+  # print(f'responseRDLength: {responseRDLength}')
+  responseRDData = decmessage[startofRR+24:startofRR+24+(2*int(responseRDLength))]
+  # print(f'responseRDData: {responseRDData}')
+  ipaddr = ''
+  for i in range(0, len(responseRDData),2):
+    ipaddr += str(int(responseRDData[i:i+2], 16))
+    ipaddr += '.'
+
+  ipArray.append(ipaddr[0:len(ipaddr)-1])
+
+for i in range(int(ancount)):
+  decodeResourceRecord(decmessage, startofRR)
+  startofRR += 32
+
+print(f'Domain Name: {url}')
+
+for i in range(len(ipArray)):
+  print(f'IP Address {i+1}: {ipArray[i]}')
+
+clientSocket = socket(AF_INET, SOCK_DGRAM)
+targethost = ipArray[0]
+print(targethost)
+clientSocket.connect((targethost, 80))
+request = "GET / HTTP/1.1\r\nHost:%s\r\n\r\n" % ipArray[0]
+clientSocket.send(request.encode())
+response = clientSocket.recv(4096)
+print(response.decode())
