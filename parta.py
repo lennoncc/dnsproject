@@ -1,16 +1,14 @@
-import time
-import random
 import binascii
+import sys
 from socket import *
+url = sys.argv[1]
 
 serverName = '169.237.229.88'
 serverPort = 53
 
 clientSocket = socket(AF_INET, SOCK_DGRAM)
 
-# payloadbuf = bytearray()
 # Header
-# payloadbuf += b'1010000100100011' # 16 bit ID (A123)
 # 0 QR indicating query
 # 0000 OPCODE to specify what kind of query
 # 0 AA not applicable, set to 0
@@ -19,10 +17,7 @@ clientSocket = socket(AF_INET, SOCK_DGRAM)
 # 0 RA not applicable, set to 0
 # 000 Z reserved for future use
 # 0000 RCODE
-# payloadbuf += b'0000000000000001' # Number of Questions
-# payloadbuf += b'0000000000000000' # Number of Answers
-# payloadbuf += b'0000000000000000' # Number of Authority Records
-# payloadbuf += b'0000000000000000' # Number of Additional Records
+# Above results in 0000000100000000, which is 0100 in hex.
 payloadbuf = ''
 payloadbuf += 'A123' # 16 bit ID in Hex
 payloadbuf += '0100' # Flags as seen above
@@ -33,14 +28,31 @@ payloadbuf += '0000' # Number of Additional Records
 
 # Question (Formatted in ASCII)
 questionbuf = ''
-questionbuf += '03' # tmz has length 3
-questionbuf += '74' # ascii for t
-questionbuf += '6d' # ascii for m
-questionbuf += '7a' # ascii for z
-questionbuf += '03' # com has length 3
-questionbuf += '63' # ascii for c
-questionbuf += '6f' # ascii for o
-questionbuf += '6d' # ascii for m
+# Split URL into 2
+spliturl = url.split('.')
+# If the part of the url before period has less than 15 characters, add a 0 for formatting
+if len(str(hex(len(spliturl[0])))) < 4:
+  questionbuf += '0'
+# Start with length of first part of URL
+questionbuf += str(hex(len(spliturl[0])))[2:]
+# Go through and add each letter of URL in hex format
+for i in spliturl[0]:
+  questionbuf += format(ord(i), "x")
+# If the part of the url after period is less than 15 characters, add 0 for formatting
+if len(str(hex(len(spliturl[1])))) < 4:
+  questionbuf += '0'
+questionbuf += str(hex(len(spliturl[1])))[2:]
+# Go through and add each letter of URL in hex format
+for i in spliturl[1]:
+  questionbuf += format(ord(i), "x")
+# questionbuf += '03' # tmz has length 3
+# questionbuf += '74' # ascii for t
+# questionbuf += '6d' # ascii for m
+# questionbuf += '7a' # ascii for z
+# questionbuf += '03' # com has length 3
+# questionbuf += '63' # ascii for c
+# questionbuf += '6f' # ascii for o
+# questionbuf += '6d' # ascii for m
 questionbuf += '00' # zero byte to end QNAME
 questionbuf += '0001' # QTYPE
 questionbuf += '0001' # QCLASS
