@@ -94,17 +94,26 @@ def decodeResourceRecord(decmessage, startofRR):
   responseRDData = decmessage[startofRR+24:startofRR+24+(2*int(responseRDLength, 16))]
   print(f'responseRDData: {responseRDData}')
   ipaddr = ''
-  for i in range(0, len(responseRDData),2):
-    ipaddr += str(int(responseRDData[i:i+2], 16))
-    ipaddr += '.'
+  if int(responseType, 16) == 2:
+    for i in range(0, len(responseRDData),2):
+      ipaddr += bytes.fromhex(responseRDData[i:i+2]).decode()
+      # ipaddr += '.'
+  else:
+    for i in range(0, len(responseRDData),2):
+      ipaddr += str(int(responseRDData[i:i+2], 16))
+      ipaddr += '.'
 
+  print(ipaddr[0:len(ipaddr)-1])
   ipArray.append(ipaddr[0:len(ipaddr)-1])
+  lengthofRR = startofRR+24+(2*int(responseRDLength, 16)) - startofRR
+  print(lengthofRR)
+  return lengthofRR
 
 
-for i in range(int(arcount, 16)):
-  decodeResourceRecord(decmessage, startofRR)
+for i in range(int(nscount, 16)):
+  lengthofRR = decodeResourceRecord(decmessage, startofRR)
   # Start of RR Won't always be 32, change to be dynamic
-  startofRR += 32
+  startofRR += lengthofRR
 
 print(f'Domain Name: {url}')
 
