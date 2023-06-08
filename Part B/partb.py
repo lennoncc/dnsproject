@@ -11,6 +11,11 @@ clientSocket = socket(AF_INET, SOCK_DGRAM)
 ipArray = []
 ancount, nscount, arcount = '', '', ''
 
+# Root DNS Server IPs
+dnsIPs = ['198.41.0.4', '199.9.14.201', '192.33.4.12', '199.7.91.13', '192.203.230.10', 
+          '192.5.5.241', '192.112.36.4', '198.97.190.53', '192.36.148.17', '192.58.128.30',
+          '193.0.14.129', '199.7.83.42', '202.12.27.33']
+
 
 # Building Header
 # 0 QR indicating query
@@ -57,12 +62,19 @@ questionLen = len(questionbuf)
 payloadbuf += questionbuf
 
 # Once DNS Message has been built, send the DNS Message first to Root Server
+def sendtoRoot(ipCounter):
+  if ipCounter > len(dnsIPs):
+    return
+  try:
+    clientSocket.sendto(binascii.unhexlify(payloadbuf), (dnsIPs[ipCounter], serverPort))
+    message, serverAddress = clientSocket.recvfrom(4096)
+    return message
+  except timeout:
+    return sendtoRoot(i+1)
+  finally:
+    clientSocket.close()
 
-clientSocket.sendto(binascii.unhexlify(payloadbuf), (serverName, serverPort))
-try:
-  message, serverAddress = clientSocket.recvfrom(4096)
-finally:
-  clientSocket.close()
+message = sendtoRoot(0)
 
 decmessage = binascii.hexlify(message).decode("utf-8")
 
