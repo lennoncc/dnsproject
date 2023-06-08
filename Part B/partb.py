@@ -1,14 +1,18 @@
 import binascii
 import sys
 from socket import *
+# Save url from command line
 url = sys.argv[1]
 
+# Set up socket
 serverName = '198.41.0.4'
 serverPort = 53
-
 clientSocket = socket(AF_INET, SOCK_DGRAM)
+ipArray = []
+ancount, nscount, arcount = '', '', ''
 
-# Header
+
+# Building Header
 # 0 QR indicating query
 # 0000 OPCODE to specify what kind of query
 # 0 AA not applicable, set to 0
@@ -52,32 +56,37 @@ questionLen = len(questionbuf)
 
 payloadbuf += questionbuf
 
+# Once DNS Message has been built, send the DNS Message first to Root Server
+
 clientSocket.sendto(binascii.unhexlify(payloadbuf), (serverName, serverPort))
 try:
   message, serverAddress = clientSocket.recvfrom(4096)
 finally:
   clientSocket.close()
 
-# print(f'in hex: {binascii.hexlify(message).decode("utf-8")}')
 decmessage = binascii.hexlify(message).decode("utf-8")
-responseid = decmessage[0:4] # Parse through id
-# print(f'id is {responseid}')
-# Header
-flags = decmessage[4:8]
-# print(f'flags are {flags}')
-qdcount = decmessage[8:12]
-# print(f'qdcount is {qdcount}')
-ancount = decmessage[12:16]
-# print(f'ancount is {ancount}')
-nscount = decmessage[16:20]
-# print(f'nscount is {int(nscount, 16)}')
-arcount = decmessage[20:24]
-# print(f'arcount is {int(arcount, 16)}')
-# Question
-# print(f'question should be: {decmessage[24:24+questionLen]}')
-startofRR = 24 + questionLen
 
-ipArray = []
+def decodeHeader(decmessage):
+  # Header
+  responseid = decmessage[0:4] # Parse through id
+  # print(f'id is {responseid}')
+  flags = decmessage[4:8]
+  # print(f'flags are {flags}')
+  qdcount = decmessage[8:12]
+  # print(f'qdcount is {qdcount}')
+  ancount = decmessage[12:16]
+  # print(f'ancount is {ancount}')
+  nscount = decmessage[16:20]
+  # print(f'nscount is {int(nscount, 16)}')
+  arcount = decmessage[20:24]
+  # print(f'arcount is {int(arcount, 16)}')
+  # Question
+  # print(f'question should be: {decmessage[24:24+questionLen]}')
+  return ancount, nscount, arcount
+
+# No need to keep track of question as it will always be the same
+startofRR = 24 + questionLen # Keep track of index where Resource Record Starts
+
 # Resource Record
 def decodeResourceRecord(decmessage, startofRR):
   # print(f'full RR: {decmessage[startofRR:len(decmessage)]}')
@@ -105,16 +114,16 @@ def decodeResourceRecord(decmessage, startofRR):
   # print(lengthofRR)
   return lengthofRR
 
+ancount,nscount,arcount = decodeHeader(decmessage)
+
 # Iterate through RRs until reach Additional Records for IP of TLD DNS Server
 for i in range(int(nscount, 16)):
   lengthofRR = decodeResourceRecord(decmessage, startofRR)
-  # Start of RR Won't always be 32, change to be dynamic
   startofRR += lengthofRR
 
 # Keep count of all IPs for TLD DNS Server(s)
 for i in range(int(arcount, 16)):
   lengthofRR = decodeResourceRecord(decmessage, startofRR)
-  # Start of RR Won't always be 32, change to be dynamic
   startofRR += lengthofRR
 
 print(f'Domain Name: {url}')
@@ -128,32 +137,18 @@ for i in range(len(ipArray)):
 serverName = ipArray[0]
 serverPort = 53
 clientSocket = socket(AF_INET, SOCK_DGRAM)
+ipArray = [] # Reset IP Addresses to keep track of Authoritative DNS Server IP Addresses
+startofRR = 24 + questionLen # Reset startofRR for new Resource Records
+
 clientSocket.sendto(binascii.unhexlify(payloadbuf), (serverName, serverPort))
 try:
   message, serverAddress = clientSocket.recvfrom(4096)
 finally:
   clientSocket.close()
 
-# print(f'in hex: {binascii.hexlify(message).decode("utf-8")}')
 decmessage = binascii.hexlify(message).decode("utf-8")
-responseid = decmessage[0:4] # Parse through id
-# print(f'id is {responseid}')
-# Header
-flags = decmessage[4:8]
-# print(f'flags are {flags}')
-qdcount = decmessage[8:12]
-# print(f'qdcount is {qdcount}')
-ancount = decmessage[12:16]
-# print(f'ancount is {ancount}')
-nscount = decmessage[16:20]
-# print(f'nscount is {int(nscount, 16)}')
-arcount = decmessage[20:24]
-# print(f'arcount is {int(arcount, 16)}')
-# Question
-# print(f'question should be: {decmessage[24:24+questionLen]}')
-startofRR = 24 + questionLen
+ancount,nscount,arcount = decodeHeader(decmessage)
 
-ipArray = []
 # Iterate through RRs until reach Additional Records for IP of TLD DNS Server
 for i in range(int(nscount, 16)):
   lengthofRR = decodeResourceRecord(decmessage, startofRR)
@@ -175,33 +170,19 @@ for i in range(len(ipArray)):
 serverName = ipArray[0]
 serverPort = 53
 clientSocket = socket(AF_INET, SOCK_DGRAM)
+ipArray = [] # Reset IP Addresses to keep track of resolved IP Addresses
+startofRR = 24 + questionLen # Reset startofRR for new Resource Records
+
 clientSocket.sendto(binascii.unhexlify(payloadbuf), (serverName, serverPort))
 try:
   message, serverAddress = clientSocket.recvfrom(4096)
 finally:
   clientSocket.close()
 
-# print(f'in hex: {binascii.hexlify(message).decode("utf-8")}')
 decmessage = binascii.hexlify(message).decode("utf-8")
-responseid = decmessage[0:4] # Parse through id
-# print(f'id is {responseid}')
-# Header
-flags = decmessage[4:8]
-# print(f'flags are {flags}')
-qdcount = decmessage[8:12]
-# print(f'qdcount is {qdcount}')
-ancount = decmessage[12:16]
-# print(f'ancount is {ancount}')
-nscount = decmessage[16:20]
-# print(f'nscount is {int(nscount, 16)}')
-arcount = decmessage[20:24]
-# print(f'arcount is {int(arcount, 16)}')
-# Question
-# print(f'question should be: {decmessage[24:24+questionLen]}')
-startofRR = 24 + questionLen
+ancount,nscount,arcoutn = decodeHeader(decmessage)
 
-ipArray = []
-# Iterate through RRs until reach Additional Records for IP of TLD DNS Server
+# Iterate through answers and keep track of IP Addresses
 for i in range(int(ancount, 16)):
   lengthofRR = decodeResourceRecord(decmessage, startofRR)
   startofRR += lengthofRR
