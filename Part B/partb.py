@@ -70,53 +70,142 @@ qdcount = decmessage[8:12]
 ancount = decmessage[12:16]
 # print(f'ancount is {ancount}')
 nscount = decmessage[16:20]
-print(f'nscount is {int(nscount, 16)}')
+# print(f'nscount is {int(nscount, 16)}')
 arcount = decmessage[20:24]
-print(f'arcount is {int(arcount, 16)}')
+# print(f'arcount is {int(arcount, 16)}')
 # Question
-print(f'question should be: {decmessage[24:24+questionLen]}')
+# print(f'question should be: {decmessage[24:24+questionLen]}')
 startofRR = 24 + questionLen
 
 ipArray = []
 # Resource Record
 def decodeResourceRecord(decmessage, startofRR):
-  print(f'full RR: {decmessage[startofRR:len(decmessage)]}')
+  # print(f'full RR: {decmessage[startofRR:len(decmessage)]}')
   responseName = decmessage[startofRR:startofRR+4]
-  print(f'responseName: {responseName}')
+  # print(f'responseName: {responseName}')
   responseType = decmessage[startofRR+4:startofRR+8]
-  print(f'responseType: {responseType}')
+  # print(f'responseType: {responseType}')
   responseClass = decmessage[startofRR+8:startofRR+12]
-  print(f'responseClass: {responseClass}')
+  # print(f'responseClass: {responseClass}')
   responseTTL = decmessage[startofRR+12:startofRR+20]
-  print(f'responseTTL: {responseTTL}')
+  # print(f'responseTTL: {responseTTL}')
   responseRDLength = decmessage[startofRR+20:startofRR+24]
-  print(f'responseRDLength: {int(responseRDLength, 16)}')
+  # print(f'responseRDLength: {int(responseRDLength, 16)}')
   responseRDData = decmessage[startofRR+24:startofRR+24+(2*int(responseRDLength, 16))]
-  print(f'responseRDData: {responseRDData}')
+  # print(f'responseRDData: {responseRDData}')
   ipaddr = ''
-  if int(responseType, 16) == 2:
-    for i in range(0, len(responseRDData),2):
-      ipaddr += bytes.fromhex(responseRDData[i:i+2]).decode()
-      # ipaddr += '.'
-  else:
+  if int(responseType, 16) == 1:
     for i in range(0, len(responseRDData),2):
       ipaddr += str(int(responseRDData[i:i+2], 16))
       ipaddr += '.'
+    ipArray.append(ipaddr[0:len(ipaddr)-1])
 
-  print(ipaddr[0:len(ipaddr)-1])
-  ipArray.append(ipaddr[0:len(ipaddr)-1])
+  # print(ipaddr[0:len(ipaddr)-1])
   lengthofRR = startofRR+24+(2*int(responseRDLength, 16)) - startofRR
-  print(lengthofRR)
+  # print(lengthofRR)
   return lengthofRR
 
-
+# Iterate through RRs until reach Additional Records for IP of TLD DNS Server
 for i in range(int(nscount, 16)):
+  lengthofRR = decodeResourceRecord(decmessage, startofRR)
+  # Start of RR Won't always be 32, change to be dynamic
+  startofRR += lengthofRR
+
+# Keep count of all IPs for TLD DNS Server(s)
+for i in range(int(arcount, 16)):
   lengthofRR = decodeResourceRecord(decmessage, startofRR)
   # Start of RR Won't always be 32, change to be dynamic
   startofRR += lengthofRR
 
 print(f'Domain Name: {url}')
 
+print('TLD Server IP Addresses:')
 for i in range(len(ipArray)):
   print(f'IP Address {i+1}: {ipArray[i]}')
 
+
+# Connect to TLD DNS Server to find Authoritative DNS Server IP
+serverName = ipArray[0]
+serverPort = 53
+clientSocket = socket(AF_INET, SOCK_DGRAM)
+clientSocket.sendto(binascii.unhexlify(payloadbuf), (serverName, serverPort))
+try:
+  message, serverAddress = clientSocket.recvfrom(4096)
+finally:
+  clientSocket.close()
+
+# print(f'in hex: {binascii.hexlify(message).decode("utf-8")}')
+decmessage = binascii.hexlify(message).decode("utf-8")
+responseid = decmessage[0:4] # Parse through id
+# print(f'id is {responseid}')
+# Header
+flags = decmessage[4:8]
+# print(f'flags are {flags}')
+qdcount = decmessage[8:12]
+# print(f'qdcount is {qdcount}')
+ancount = decmessage[12:16]
+# print(f'ancount is {ancount}')
+nscount = decmessage[16:20]
+# print(f'nscount is {int(nscount, 16)}')
+arcount = decmessage[20:24]
+# print(f'arcount is {int(arcount, 16)}')
+# Question
+# print(f'question should be: {decmessage[24:24+questionLen]}')
+startofRR = 24 + questionLen
+
+ipArray = []
+# Iterate through RRs until reach Additional Records for IP of TLD DNS Server
+for i in range(int(nscount, 16)):
+  lengthofRR = decodeResourceRecord(decmessage, startofRR)
+  # Start of RR Won't always be 32, change to be dynamic
+  startofRR += lengthofRR
+
+# Keep count of all IPs for TLD DNS Server(s)
+for i in range(int(arcount, 16)):
+  lengthofRR = decodeResourceRecord(decmessage, startofRR)
+  # Start of RR Won't always be 32, change to be dynamic
+  startofRR += lengthofRR
+
+print('Authoritative DNS Server IP Addresses:')
+for i in range(len(ipArray)):
+  print(f'IP Address {i+1}: {ipArray[i]}')
+
+
+# Connect to Authoritative DNS Server to find resolved IP Address for A record
+serverName = ipArray[0]
+serverPort = 53
+clientSocket = socket(AF_INET, SOCK_DGRAM)
+clientSocket.sendto(binascii.unhexlify(payloadbuf), (serverName, serverPort))
+try:
+  message, serverAddress = clientSocket.recvfrom(4096)
+finally:
+  clientSocket.close()
+
+# print(f'in hex: {binascii.hexlify(message).decode("utf-8")}')
+decmessage = binascii.hexlify(message).decode("utf-8")
+responseid = decmessage[0:4] # Parse through id
+# print(f'id is {responseid}')
+# Header
+flags = decmessage[4:8]
+# print(f'flags are {flags}')
+qdcount = decmessage[8:12]
+# print(f'qdcount is {qdcount}')
+ancount = decmessage[12:16]
+# print(f'ancount is {ancount}')
+nscount = decmessage[16:20]
+# print(f'nscount is {int(nscount, 16)}')
+arcount = decmessage[20:24]
+# print(f'arcount is {int(arcount, 16)}')
+# Question
+# print(f'question should be: {decmessage[24:24+questionLen]}')
+startofRR = 24 + questionLen
+
+ipArray = []
+# Iterate through RRs until reach Additional Records for IP of TLD DNS Server
+for i in range(int(ancount, 16)):
+  lengthofRR = decodeResourceRecord(decmessage, startofRR)
+  startofRR += lengthofRR
+
+print('Answer IP Addresses:')
+for i in range(len(ipArray)):
+  print(f'IP Address {i+1}: {ipArray[i]}')
